@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Generated pipeline artifacts (reproducible via run_pipeline.py)
+/data/*.csv
+/output/*.csv
+/output/*.json
+/output/*.md
