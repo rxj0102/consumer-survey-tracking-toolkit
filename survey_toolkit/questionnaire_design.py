@@ -48,7 +48,9 @@ AI_BRANDS: List[str] = [
     "Ledger AI",
     "Solace AI",
 ]
-AI_NONE = "None"
+AI_NONE = "No AI Product Used"  # NB: must never be the literal string "None" -- pandas'
+# default read_csv na_values list treats "None" as missing data, which would silently
+# corrupt this column into NaN on every CSV round-trip.
 
 BRAND_CATEGORIES: Dict[str, List[str]] = {
     "telecom": TELECOM_BRANDS,
