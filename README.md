@@ -1,5 +1,7 @@
 # Consumer Survey Tracking Toolkit
 
+[![CI](https://github.com/rxj0102/consumer-survey-tracking-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/rxj0102/consumer-survey-tracking-toolkit/actions/workflows/ci.yml)
+
 A Python toolkit that models the end-to-end workflow of a market research
 analyst running a **recurring weekly consumer-sentiment tracker**, in the
 spirit of the telecom/airline/AI trackers that firms like YouGov, Morning
