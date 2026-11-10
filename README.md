@@ -141,3 +141,29 @@ weighting math (raking convergence against population targets), the
 significance-testing math (z-test correctness at known inputs), and
 trend-detection logic (rolling averages, minimum-base-size filtering,
 headline vs. non-obvious shift selection).
+
+## Reproducibility
+
+### Data availability
+
+Inputs ship in the `data/` folder of this repository. No external downloads are needed.
+
+### Computational requirements
+
+- Python 3.12.3. Every dependency version is pinned in `uv.lock`.
+- Checked on Linux x86_64 with 2 CPU cores and 8 GB RAM. No GPU is needed.
+
+```bash
+pip install uv     # once
+uv sync            # installs the exact pinned environment
+uv run pytest -q   # runs the test suite
+```
+
+### Runtime
+
+The test suite (35 tests) finishes in about 62 seconds on the machine above, including any data downloads it triggers.
+
+### Citation
+
+Citation metadata is in `CITATION.cff`. GitHub turns it into a Cite this repository button on the repo page.
+
