@@ -61,6 +61,28 @@ def ztest_proportions(count1: int, n1: int, count2: int, n2: int, alpha: float =
     return ZTestResult(count1, n1, count2, n2, p1, p2, z, p_value, significant)
 
 
+def kish_effective_n(weights: Optional[pd.Series], n: int) -> float:
+    """Kish effective sample size (sum w)^2 / sum w^2; equals n without weights."""
+    if weights is None:
+        return float(n)
+    w = np.asarray(weights, dtype=float)
+    ss = float((w**2).sum())
+    return float(w.sum() ** 2 / ss) if ss > 0 else 0.0
+
+
+def ztest_weighted(
+    p1: float, neff1: float, p2: float, neff2: float, alpha: float = DEFAULT_ALPHA
+) -> ZTestResult:
+    """Two-proportion z-test on weighted proportions with Kish effective sample sizes.
+
+    The test compares the same weighted proportions that are reported, and the
+    effective sizes widen the standard error by the design effect of the weights.
+    """
+    if neff1 <= 0 or neff2 <= 0 or not np.isfinite(p1) or not np.isfinite(p2):
+        return ZTestResult(p1 * neff1, neff1, p2 * neff2, neff2, p1, p2, np.nan, np.nan, False)
+    return ztest_proportions(p1 * neff1, neff1, p2 * neff2, neff2, alpha=alpha)
+
+
 def weighted_proportion(mask: pd.Series, weights: Optional[pd.Series] = None) -> tuple:
     """Return (weighted_count, weighted_n) for a boolean mask. Falls back
     to unweighted counts when weights is None."""
@@ -91,8 +113,6 @@ def generate_banner_table(
     metric = df[metric_col].astype(bool)
 
     total_count, total_n = weighted_proportion(metric[valid], weights[valid] if weights is not None else None)
-    # unweighted counts, used for the significance test (z-test assumes
-    # simple random sample counts; weighted N is reported separately)
     total_count_uw = int(metric[valid].sum())
     total_n_uw = int(valid.sum())
 
@@ -106,10 +126,19 @@ def generate_banner_table(
                 metric[seg_mask], weights[seg_mask] if weights is not None else None
             )
 
-            # compare this segment against the rest of the sample (excludes itself)
-            rest_count_uw = total_count_uw - seg_count_uw
-            rest_n_uw = total_n_uw - seg_n_uw
-            test = ztest_proportions(seg_count_uw, seg_n_uw, rest_count_uw, rest_n_uw, alpha=alpha)
+            # compare this segment against the rest of the sample (excludes itself),
+            # on the weighted proportions that are reported, with Kish effective sizes
+            rest_mask = valid & ~(df[banner_var] == segment)
+            rest_count_w, rest_n_w = weighted_proportion(
+                metric[rest_mask], weights[rest_mask] if weights is not None else None
+            )
+            test = ztest_weighted(
+                seg_count_w / seg_n_w if seg_n_w else np.nan,
+                kish_effective_n(weights[seg_mask] if weights is not None else None, seg_n_uw),
+                rest_count_w / rest_n_w if rest_n_w else np.nan,
+                kish_effective_n(weights[rest_mask] if weights is not None else None, int(rest_mask.sum())),
+                alpha=alpha,
+            )
 
             rows.append(
                 {

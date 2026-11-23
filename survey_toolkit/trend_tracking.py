@@ -7,8 +7,9 @@ significance, and picks out the single most notable shift in the data --
 explicitly distinguishing the obvious topline ("headline") movement from a
 more interesting segment-level ("non-obvious") one.
 
-All significance testing reduces to a two-proportion z-test (see
-crosstab_analysis.ztest_proportions): proportion metrics test directly,
+All significance testing reduces to a two-proportion z-test on weighted
+shares with Kish effective sample sizes (see crosstab_analysis.ztest_weighted):
+proportion metrics test directly,
 and NPS-style metrics are tested via their promoter rate (share of
 scores >= 9), which is documented as a standard, tractable proxy for
 movement in the full NPS figure.
@@ -23,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from survey_toolkit import questionnaire_design as qd
-from survey_toolkit.crosstab_analysis import ztest_proportions
+from survey_toolkit.crosstab_analysis import kish_effective_n, ztest_weighted
 
 SEGMENT_VARS = ["age_band", "region"]
 ROLLING_WINDOW = 3
@@ -171,7 +172,11 @@ def build_tracking_dataset(
                 if seg_df.empty:
                     continue
                 value = _display_value(seg_df, spec, weight_col)
-                success_uw = int(_success_series(seg_df, spec).sum())
+                success = _success_series(seg_df, spec)
+                success_uw = int(success.sum())
+                w = seg_df[weight_col] if (weight_col and weight_col in seg_df.columns) else None
+                share_w = float((success * w).sum() / w.sum()) if w is not None and w.sum() > 0 else float(success.mean())
+                n_eff = kish_effective_n(w, len(seg_df))
                 rows.append(
                     {
                         "wave": wave,
@@ -185,6 +190,8 @@ def build_tracking_dataset(
                         "weighted_n": float(seg_df[weight_col].sum()) if weight_col and weight_col in seg_df else float(len(seg_df)),
                         "value": value,
                         "success_n": success_uw,
+                        "success_share_w": share_w,
+                        "n_eff": n_eff,
                     }
                 )
 
@@ -203,10 +210,18 @@ def add_rolling_average(tracking_df: pd.DataFrame, window: int = ROLLING_WINDOW)
     return out
 
 
+def _share_and_neff(row: pd.Series) -> tuple:
+    """Weighted success share and Kish effective n; unweighted rows fall back to success_n / n."""
+    if "success_share_w" in row.index and "n_eff" in row.index:
+        return float(row["success_share_w"]), float(row["n_eff"])
+    return float(row["success_n"]) / float(row["n"]), float(row["n"])
+
+
 def compute_wow_shifts(tracking_df: pd.DataFrame, alpha: float = 0.05, min_n: int = 40) -> pd.DataFrame:
     """For each (category, brand, metric, segment_var, segment_value) time
     series, test every consecutive wave pair for a statistically
-    significant shift via a two-proportion z-test on success_n/n.
+    significant shift via a two-proportion z-test on the weighted success share
+    with Kish effective sample sizes (``n_eff``).
 
     ``min_n`` guards against spurious "significant" results in tiny cells
     (e.g. a niche brand cut by a small age segment): wave-pairs where
@@ -221,11 +236,7 @@ def compute_wow_shifts(tracking_df: pd.DataFrame, alpha: float = 0.05, min_n: in
         prev = None
         for _, curr in group.iterrows():
             if prev is not None and curr["n"] >= min_n and prev["n"] >= min_n:
-                test = ztest_proportions(
-                    int(curr["success_n"]), int(curr["n"]),
-                    int(prev["success_n"]), int(prev["n"]),
-                    alpha=alpha,
-                )
+                test = ztest_weighted(*_share_and_neff(curr), *_share_and_neff(prev), alpha=alpha)
                 rows.append(
                     {
                         "category": curr["category"],

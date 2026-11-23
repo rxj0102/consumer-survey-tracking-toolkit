@@ -94,3 +94,21 @@ def test_generate_banner_table_weighting_and_mean_banner():
     seg_a_mean = mean_table[(mean_table["banner_var"] == "group") & (mean_table["segment"] == "A")].iloc[0]
     # weighted mean of [1,2] with weights [1,3] = (1*1 + 2*3)/4 = 1.75
     assert seg_a_mean["mean"] == pytest.approx(1.75)
+
+
+def test_kish_effective_n_and_weighted_test():
+    import numpy as np
+    import pandas as pd
+
+    from survey_toolkit.crosstab_analysis import kish_effective_n, ztest_proportions, ztest_weighted
+
+    assert kish_effective_n(None, 50) == 50
+    assert kish_effective_n(pd.Series([1.0] * 40), 40) == 40
+    w = pd.Series([1.0] * 50 + [3.0] * 50)
+    assert kish_effective_n(w, 100) == (200.0**2) / (50 + 450)  # 80
+    # equal weights reduce to the ordinary test
+    a = ztest_weighted(0.6, 100, 0.5, 120)
+    b = ztest_proportions(60, 100, 60, 120)
+    assert np.isclose(a.z, b.z)
+    # a smaller effective n gives a weaker test for the same proportions
+    assert abs(ztest_weighted(0.6, 50, 0.5, 60).z) < abs(a.z)
