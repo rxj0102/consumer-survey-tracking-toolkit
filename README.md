@@ -92,7 +92,12 @@ python3 -m survey_toolkit.narrative_report
   targets, so shifts in sample composition wave-to-wave don't masquerade
   as real attitude change.
 - **Significance testing.** All significance testing is a two-proportion
-  z-test on unweighted respondent counts (`crosstab_analysis.ztest_proportions`).
+  z-test on the weighted proportions that are reported, with Kish effective
+  sample sizes, (sum w)^2 / sum w^2, so the standard error carries the
+  design effect of the weights (`crosstab_analysis.ztest_weighted`). An
+  earlier version tested unweighted counts, which could flag a difference
+  other than the weighted one shown, and ignored the precision lost to
+  weighting.
   NPS-style items are tested via their promoter share, a standard,
   tractable proxy for movement in the full NPS figure. Wave-over-wave
   tests enforce a minimum base size (`min_n`) before testing a cell, since
